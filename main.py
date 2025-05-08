@@ -3,30 +3,33 @@ import tempfile
 from cairosvg import svg2png
 from pdf2image import convert_from_path
 from pptx import Presentation
-from pptx.util import Inches
+from pptx.util import Inches, Pt
 import sys
 
 def pdf_to_pptx(pdf_path, output_pptx):
-    # PDF → PNG（各ページ）
     pages = convert_from_path(pdf_path)
     prs = Presentation()
 
+    # 最初のページのサイズでアスペクト比取得
+    first_page = pages[0]
+    pdf_width_px, pdf_height_px = first_page.size
+    aspect_ratio = pdf_width_px / pdf_height_px
+
+    # 任意の高さを設定（ポイント単位、ここでは7.5インチ = 540ポイントに）
+    slide_height = Inches(7.5)
+    slide_width = Pt(aspect_ratio * slide_height.pt)
+
+    prs.slide_width = slide_width
+    prs.slide_height = slide_height
+
     for i, page in enumerate(pages):
-        # 一時ファイルに保存
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
             page.save(tmp_img.name, "PNG")
             slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank slide
 
-            # スライドサイズに合わせて画像を挿入
-            prs_width = prs.slide_width
-            prs_height = prs.slide_height
-
-            slide.shapes.add_picture(tmp_img.name, 0, 0, width=prs_width, height=prs_height)
-
-            # 削除のためにパス保存
+            slide.shapes.add_picture(tmp_img.name, 0, 0, width=slide_width, height=slide_height)
             img_path = tmp_img.name
 
-        # 一時ファイル削除
         os.remove(img_path)
 
     prs.save(output_pptx)
